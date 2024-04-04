@@ -1,0 +1,114 @@
+import numpy as np
+import math, random
+from torch import randperm
+
+
+def levy_flight(size, alpha=1.5, beta=0.5):
+    sigma = (np.math.gamma(1 + alpha) * np.sin(np.pi * alpha / 2) / (
+                np.math.gamma((1 + alpha) / 2) * alpha * 2 ** ((alpha - 1) / 2))) ** (1 / alpha)
+    u = np.random.normal(0, sigma, size)
+    v = np.random.normal(0, 1, size)
+    r = u / (abs(v) ** (1 / alpha))
+    x = np.random.normal(0, (1 / beta), size)
+    return x * r
+
+
+def ELO_2014(SearchAgents_no, Tmax, ub, lb, dim, fobj):
+    Convergence_curve = np.ones(Tmax) * np.inf  # A list to hold the global optimal fitness value for each iteration
+    Global_Best_position = np.ones(dim)  # Global best position
+    Global_Best_fitness = np.inf  # The fitness value of the global optimal position
+    Individual_Best_Fitness = np.ones(SearchAgents_no) * np.inf  # Historical optimal fitness values of individuals
+    Individual_Best_Positions = np.zeros((SearchAgents_no, dim))  # Individual Historical Optimal Position
+
+    # Initialization
+    for i in range(dim):  # Randomly initialize population
+        Individual_Best_Positions[:, i] = np.random.rand(SearchAgents_no) * (ub[i] - lb[i]) + lb[i]  # Equation (3)
+    for i in range(SearchAgents_no):  # Calculate the fitness value of the individual's optimal position
+        L = Individual_Best_Positions[i, :].copy()  # Duplicate individual historical optimal position vectors
+        Individual_Best_Fitness[i] = fobj(L)  # Calculate the fitness value of the current individual's historical optimal position
+        if Individual_Best_Fitness[i] < Global_Best_fitness:  # If the current individual historical optimal position is better than the global optimal position
+            Global_Best_fitness = Individual_Best_Fitness[i].copy()  # Update the fitness value of the global optimal position
+            Global_Best_position = Individual_Best_Positions[i, :].copy()  # Update global optimal position
+
+    Positions_NEW = Individual_Best_Positions.copy()  # Initialize the initial position of the population
+    Fitness_NEW = Individual_Best_Fitness.copy()  # Preserve the fitness value of the initial position of the population
+
+    # Main loop
+    for t in range(Tmax):  # 1000 iterations of the algorithm
+        for i in range(SearchAgents_no):  # Every Eurasian lynx in the population.
+            # Exploration (Phase 1)
+            if t < 100:
+                if np.random.random() < 0.2 : # if p1<0.2
+                    for d in range(dim):  # Each dimension in the Eurasian lynx position vector
+                        if Global_Best_position[d] < (ub[d] - lb[d]) / 2:   # Equation (4)
+                            Positions_NEW[i:d] = Global_Best_position[d] + np.random.random() * ((ub[d] - lb[d]) / 2 - Global_Best_position[d])
+                        else:
+                            Positions_NEW[i:d] = (ub[d] - lb[d]) / 2 + np.random.random() * (Global_Best_position[d] - (ub[d] - lb[d]) / 2)
+                else:
+                    pop_list = list(range(0, SearchAgents_no))  # Generate the serial number of each search agent in the population
+                    pop_list.remove(i)  # Kicking the current Eurasian lynx serial number from the serial number list
+                    rsi = random.sample(pop_list, 2)  # Randomly select two different search agents from the remaining serial numbers
+                    Positions_NEW[i, :] = Positions_NEW[i, :] + np.random.random(size=dim) * (
+                                Individual_Best_Positions[i, :] - Positions_NEW[rsi[0], :]) + np.random.random(size=dim) * (
+                                                      Individual_Best_Positions[i, :] - Positions_NEW[rsi[1], :])  # Equation (5)
+
+            # Exploration and Exploitation (Phase 2)
+            elif t < 500:
+                p = np.random.random()  # generate random number p2
+                if p < 0.2:  # if p2<0.2
+                    dv = np.ones(dim)  # Generate an all-1 direction vector.
+                    for d in range(dim):  # For each dimension in the direction vector
+                        if np.random.random() < 0.3: # if p3<0.3
+                            dv[d] = 0  # Set the current dimension value in the position vector to 0
+                    Positions_NEW[i, :] = Positions_NEW[i, :] + dv * np.random.random(dim) * (Global_Best_position - Positions_NEW[i, :]) # Equation (6)
+                else:
+                    I = round(1 + np.random.random())  # Generate a random number (1 or 2)
+                    k = np.random.choice(range(SearchAgents_no))  # Randomly select an individual serial number from the population species
+                    P = Individual_Best_Positions[k, :].copy()  # Copy the historical optimal position of Eurasian lynx individuals with selected serial numbers
+                    F_P = Individual_Best_Fitness[k]  # Obtain the fitness value of its individual historical optimal position
+                    if Individual_Best_Fitness[i] > F_P:  # If the current individual historical optimal position is inferior to the randomly selected individual historical optimal position
+                        Positions_NEW[i, :] = Individual_Best_Positions[i, :].copy() + np.random.rand(dim) * (
+                                P - I * Individual_Best_Positions[i, :].copy())  # Eq.(8)
+                    else:
+                        Positions_NEW[i, :] = Individual_Best_Positions[i, :].copy() + np.random.rand(dim) * (
+                                Individual_Best_Positions[i, :].copy() - P)  # Eq. (8)
+
+            # Exploitation (Phase 3)
+            else:
+                direct_vector = np.zeros((SearchAgents_no, dim)) # Generate a direction vector with all zeros
+                rand_dim = randperm(dim)  # Randomly disrupt a sequence of direction vector numbers
+                rand_num = np.ceil(np.random.rand() * (dim - 1)) # Generate a random integer that determines how many dimensions are set to 1.
+                direct_vector[i, rand_dim[:int(rand_num)]] = 1  # Randomly select rand_num dimensions from the direction vector, set to 1
+
+                p = np.random.random() # a random number p4
+                if p < 0.2:  # if p4<0.2
+                    Positions_NEW[i, :] = (Global_Best_position + levy_flight(dim) * direct_vector[i, :] *
+                                           (Global_Best_position - Individual_Best_Positions[i, :]))  # Eq. (9)
+                elif p < 0.9:
+                    SearchAgents_no_list = list(range(SearchAgents_no))  # Generate the serial number of each search agent in the population
+                    SearchAgents_no_list.remove(i)   # Kicking the current Eurasian lynx serial number from the serial number list
+                    m = random.sample(SearchAgents_no_list, 1)  # Randomly select an ordinal number from the population sequence that is different from the current individual
+                    selected_searchAgent = Individual_Best_Positions[m, :].copy()  # Get the historical optimal position of the individual with this serial number
+                    Positions_NEW[i, :] = (Global_Best_position + np.random.normal(loc=0.0, scale=10) * (1-t/Tmax) *
+                                           (Individual_Best_Positions[i, :] - selected_searchAgent)) # Eq. (9)
+                else:
+                    Positions_NEW[i, :] = Global_Best_position * (1-t/Tmax) # Eq. (9)
+
+            for d in range(dim):  # For each dimension in the direction vector
+                if Positions_NEW[i, d] > ub[d]:
+                    Positions_NEW[i, d] = lb[d] + np.random.random() * (ub[d] - lb[d])  # Reinitialize individuals larger than the upper bound of the search space
+                elif Positions_NEW[i, d] < lb[d]:
+                    Positions_NEW[i, d] = lb[d] + np.random.random() * (ub[d] - lb[d])  # Reinitialize individuals smaller than the lower bound of the search space
+
+            L = Positions_NEW[i, :].copy()  # Copy the current individual position vector
+            Fitness_NEW[i] = fobj(L)  # Calculate the fitness value for the current search individual
+            if Fitness_NEW[i] < Individual_Best_Fitness[i]:  # If the current individual position is better than the individual's historical optimal position
+                Individual_Best_Fitness[i] = Fitness_NEW[i]  # Update the current individual historical optimal fitness value
+                Individual_Best_Positions[i, :] = Positions_NEW[i].copy()  # Update the current individual historical optimal fitness value
+
+                if Individual_Best_Fitness[i] < Global_Best_fitness:  # If the current individual historical optimal position is better than the global optimal position
+                    Global_Best_fitness = Individual_Best_Fitness[i]  # Update the global optimal fitness value
+                    Global_Best_position = Individual_Best_Positions[i, :].copy()  # Update global optimal position
+
+        Convergence_curve[t] = Global_Best_fitness  # Update the current iteration global optimal fitness value
+    return Global_Best_fitness, Global_Best_position, Convergence_curve  # Return the global optimal fitness value, the global optimal position and the historical global optimal fitness value
