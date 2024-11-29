@@ -1,3 +1,6 @@
+# Eurasian lynx optimizer: a novel metaheuristic optimization algorithm for global optimization and engineering applications
+# Wang, X. (2024). Eurasian lynx optimizer: a novel metaheuristic optimization algorithm for global optimization and engineering applications. Physica Scripta, 99(11), 115275.
+
 import numpy as np
 import math, random
 from torch import randperm
